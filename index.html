@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <title>Kelime Düellosu: Kırmızı vs Mavi</title>
+    <style>
+        /* --- GENEL TASARIM --- */
+        body {
+            background-color: #121212;
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 10px; /* Mobilde kenar boşluğu az olsun */
+            min-height: 100vh;
+            touch-action: manipulation; /* Telefondaki gecikmeyi önler */
+        }
+
+        /* --- SKOR TABLOSU --- */
+        .scoreboard {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 20px;
+            background: #1e1e1e;
+            padding: 10px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            border: 1px solid #333;
+        }
+
+        .player-box {
+            text-align: center;
+            padding: 10px;
+            border-radius: 10px;
+            width: 30%;
+            opacity: 0.4;
+            transition: all 0.3s;
+            font-size: 0.9rem; /* Mobilde yazılar taşmasın */
+        }
+
+        .player-1 { color: #ff4d4d; }
+        .player-2 { color: #3498db; }
+
+        .aktif-kirmizi { 
+            opacity: 1; background-color: rgba(255, 77, 77, 0.1); 
+            border: 1px solid #ff4d4d; transform: scale(1.05); 
+        }
+        .aktif-mavi { 
+            opacity: 1; background-color: rgba(52, 152, 219, 0.1); 
+            border: 1px solid #3498db; transform: scale(1.05); 
+        }
+
+        .score { font-size: 1.5rem; font-weight: bold; }
+
+        /* --- SAYAÇ --- */
+        .timer-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .timer-box { font-size: 2rem; font-weight: bold; color: #f1c40f; }
+
+        /* --- OYUN ALANI (PC İÇİN) --- */
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(5, 90px); /* PC'de 5 sütun */
+            gap: 15px;
+            perspective: 1000px;
+        }
+
+        .card {
+            width: 90px;
+            height: 90px;
+            background-color: #444;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
+            color: transparent;
+            user-select: none;
+            transition: transform 0.4s;
+            transform: rotateY(180deg);
+            -webkit-tap-highlight-color: transparent; /* Mobilde tıklama maviliğini kaldır */
+        }
+
+        .card.acik {
+            background-color: #ecf0f1;
+            color: #2c3e50;
+            transform: rotateY(0deg);
+        }
+
+        .card.eslesti-kirmizi { background-color: #ff4d4d; color: white; transform: rotateY(0deg); }
+        .card.eslesti-mavi { background-color: #3498db; color: white; transform: rotateY(0deg); }
+
+        #restartBtn {
+            margin-top: 30px;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #e74c3c, #3498db);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+        }
+
+        /* --- 📱 MOBİL İÇİN ÖZEL AYAR (RESPONSIVE) --- */
+        @media (max-width: 600px) {
+            .game-board {
+                grid-template-columns: repeat(4, 75px); /* Mobilde 4 sütun olsun */
+                gap: 10px;
+            }
+            .card {
+                width: 75px; /* Kartlar küçülsün */
+                height: 75px;
+                font-size: 12px; /* Yazılar küçülsün */
+            }
+            .scoreboard {
+                flex-direction: row; /* Yan yana kalsın ama sıkışmasın */
+                padding: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="scoreboard">
+        <div class="player-box player-1" id="p1Box">
+            <div>KIRMIZI</div>
+            <div class="score" id="p1Score">0</div>
+        </div>
+        
+        <div class="timer-container">
+            <div style="font-size:0.7rem; color:#aaa;">SÜRE</div>
+            <div class="timer-box" id="timeDisplay">10</div>
+        </div>
+
+        <div class="player-box player-2" id="p2Box">
+            <div>MAVİ</div>
+            <div class="score" id="p2Score">0</div>
+        </div>
+    </div>
+
+    <div class="game-board" id="board"></div>
+
+    <button id="restartBtn" onclick="oyunuBaslat()">KARTLARI DAĞIT 🎲</button>
+
+    <script>
+        const tumKelimeler = [
+            { en: "Computer", tr: "Bilgisayar" }, { en: "Network", tr: "Ağ" },
+            { en: "Software", tr: "Yazılım" }, { en: "Screen", tr: "Ekran" },
+            { en: "Mouse", tr: "Fare" }, { en: "Keyboard", tr: "Klavye" },
+            { en: "Database", tr: "Veritabanı" }, { en: "Security", tr: "Güvenlik" },
+            { en: "Cloud", tr: "Bulut" }, { en: "Server", tr: "Sunucu" },
+            { en: "Apple", tr: "Elma" }, { en: "Red", tr: "Kırmızı" },
+            { en: "Blue", tr: "Mavi" }, { en: "Car", tr: "Araba" },
+            { en: "Book", tr: "Kitap" }, { en: "School", tr: "Okul" },
+            { en: "Pen", tr: "Kalem" }, { en: "Door", tr: "Kapı" },
+            { en: "Cat", tr: "Kedi" }, { en: "Dog", tr: "Köpek" },
+            { en: "Code", tr: "Kod" }, { en: "Loop", tr: "Döngü" },
+            { en: "Input", tr: "Giriş" }, { en: "Output", tr: "Çıkış" },
+            { en: "Variable", tr: "Değişken" }, { en: "Array", tr: "Dizi" },
+            { en: "Function", tr: "Fonksiyon" }, { en: "Error", tr: "Hata" },
+            { en: "File", tr: "Dosya" }, { en: "User", tr: "Kullanıcı" }
+        ];
+
+        let oyunKartlari = [], acikKartlar = [], kilitli = false;
+        let siraKimde = 1, puan1 = 0, puan2 = 0, bulunanCift = 0;
+        let kalanSure = 10, sayacInterval = null;
+        let toplamCift = 10; // PC'de 10 çift
+
+        // Mobilde ekran küçükse 8 çifte düşürelim ki sığsın
+        if (window.innerWidth < 600) { toplamCift = 8; }
+
+        const board = document.getElementById("board");
+        const p1Box = document.getElementById("p1Box");
+        const p2Box = document.getElementById("p2Box");
+        const p1ScoreDisplay = document.getElementById("p1Score");
+        const p2ScoreDisplay = document.getElementById("p2Score");
+        const timeDisplay = document.getElementById("timeDisplay");
+
+        function oyunuBaslat() {
+            puan1 = 0; puan2 = 0; bulunanCift = 0; siraKimde = 1; 
+            acikKartlar = []; kilitli = false;
+            p1ScoreDisplay.innerText = 0; p2ScoreDisplay.innerText = 0;
+            uiGuncelle();
+
+            let karisikHavuz = tumKelimeler.sort(() => 0.5 - Math.random()).slice(0, toplamCift);
+            oyunKartlari = [];
+            karisikHavuz.forEach((item, index) => {
+                oyunKartlari.push({ id: index, text: item.en });
+                oyunKartlari.push({ id: index, text: item.tr });
+            });
+            oyunKartlari.sort(() => 0.5 - Math.random());
+            tahtayiCiz();
+            sureyiBaslat();
+        }
+
+        function tahtayiCiz() {
+            board.innerHTML = "";
+            oyunKartlari.forEach((kartVerisi) => {
+                const kartDiv = document.createElement("div");
+                kartDiv.classList.add("card");
+                kartDiv.innerText = kartVerisi.text;
+                kartDiv.dataset.id = kartVerisi.id;
+                kartDiv.addEventListener("click", kartAc);
+                board.appendChild(kartDiv);
+            });
+        }
+
+        function sureyiBaslat() {
+            clearInterval(sayacInterval);
+            kalanSure = 10;
+            timeDisplay.innerText = kalanSure;
+            timeDisplay.style.color = "#f1c40f";
+
+            sayacInterval = setInterval(() => {
+                kalanSure--;
+                timeDisplay.innerText = kalanSure;
+                if (kalanSure <= 3) timeDisplay.style.color = "#e74c3c";
+                if (kalanSure <= 0) { clearInterval(sayacInterval); sureBitti(); }
+            }, 1000);
+        }
+
+        function sureBitti() {
+            acikKartlar.forEach(kart => {
+                kart.classList.remove("acik");
+                kart.style.transform = "rotateY(180deg)";
+            });
+            acikKartlar = []; kilitli = false;
+            sirayiDegistir();
+            if (bulunanCift < toplamCift) sureyiBaslat();
+        }
+
+        function kartAc() {
+            if (kilitli || this.classList.contains("acik") || this.classList.contains("eslesti-kirmizi") || this.classList.contains("eslesti-mavi")) return;
+            this.classList.add("acik");
+            acikKartlar.push(this);
+            if (acikKartlar.length === 2) {
+                clearInterval(sayacInterval);
+                eslesmeKontrol();
+            }
+        }
+
+        function eslesmeKontrol() {
+            kilitli = true;
+            const k1 = acikKartlar[0];
+            const k2 = acikKartlar[1];
+            if (k1.dataset.id === k2.dataset.id) {
+                if (siraKimde === 1) {
+                    puan1 += 10; p1ScoreDisplay.innerText = puan1;
+                    k1.classList.add("eslesti-kirmizi"); k2.classList.add("eslesti-kirmizi");
+                } else {
+                    puan2 += 10; p2ScoreDisplay.innerText = puan2;
+                    k1.classList.add("eslesti-mavi"); k2.classList.add("eslesti-mavi");
+                }
+                bulunanCift++; acikKartlar = []; kilitli = false;
+                if (bulunanCift === toplamCift) setTimeout(oyunBitti, 500);
+                else sureyiBaslat();
+            } else {
+                setTimeout(() => {
+                    k1.classList.remove("acik"); k2.classList.remove("acik");
+                    acikKartlar = []; kilitli = false;
+                    sirayiDegistir(); sureyiBaslat();
+                }, 1000);
+            }
+        }
+
+        function sirayiDegistir() {
+            siraKimde = siraKimde === 1 ? 2 : 1;
+            uiGuncelle();
+        }
+
+        function uiGuncelle() {
+            if (siraKimde === 1) {
+                p1Box.classList.add("aktif-kirmizi"); p2Box.classList.remove("aktif-mavi");
+            } else {
+                p1Box.classList.remove("aktif-kirmizi"); p2Box.classList.add("aktif-mavi");
+            }
+        }
+
+        function oyunBitti() {
+            clearInterval(sayacInterval);
+            let mesaj = "";
+            if (puan1 > puan2) mesaj = "KIRMIZI KAZANDI! 🔴";
+            else if (puan2 > puan1) mesaj = "MAVİ KAZANDI! 🔵";
+            else mesaj = "DOSTLUK KAZANDI! 🤝";
+            alert(mesaj);
+        }
+    </script>
+</body>
+</html>
